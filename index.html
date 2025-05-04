@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Artist Leaderboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+    button { padding: 10px 15px; margin: 5px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    input { padding: 8px; margin: 5px; width: 100%; }
+    .artist { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ccc; }
+    #status { margin: 10px 0; color: #d9534f; }
+  </style>
+</head>
+<body>
+  <h1>Artist Leaderboard</h1>
+  <button id="connect">Connect Wallet</button>
+  <input id="artistName" placeholder="Artist Name" />
+  <button id="mint" disabled>Mint Artist (1 YODA)</button>
+  <div id="status"></div>
+  <div id="leaderboard"></div>
+
+  <script>
+    const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Contract ADdreess
+
+    const CONTRACT_ABI = [
+      {
+        "inputs": [{"internalType": "string", "name": "name", "type": "string"}],
+        "name": "mintArtist", "outputs": [], "stateMutability": "nonpayable", "type": "function"
+      },
+      {
+        "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+        "name": "vote", "outputs": [], "stateMutability": "nonpayable", "type": "function"
+      },
+      {
+        "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "name": "artists", "outputs": [
+          { "internalType": "string", "name": "name", "type": "string" },
+          { "internalType": "uint256", "name": "voteCount", "type": "uint256" }
+        ],
+        "stateMutability": "view", "type": "function"
+      }
+    ];
+
+    let web3, contract, account;
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+        account = accounts[0];
+        contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+        document.getElementById("status").innerText = "Wallet connected: " + account;
+        document.getElementById("mint").disabled = false;
+        loadLeaderboard();
+      } else {
+        alert("MetaMask not detected");
+      }
+    }
+
+    async function mintArtist() {
+      const name = document.getElementById("artistName").value;
+      if (!name) return alert("Enter an artist name");
+      try {
+        await contract.methods.mintArtist(name).send({ from: account });
+        document.getElementById("status").innerText = "Artist minted!";
+        document.getElementById("artistName").value = "";
+        setTimeout(loadLeaderboard, 3000); // Refresh after 3s
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "Error during mint.";
+      }
+    }
+
+    async function voteOnArtist(id) {
+      try {
+        await contract.methods.vote(id).send({ from: account });
+        document.getElementById("status").innerText = "Vote submitted!";
+        setTimeout(loadLeaderboard, 3000);
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "Vote failed.";
+      }
+    }
+
+    async function loadLeaderboard() {
+  document.getElementById("leaderboard").innerHTML = "Loading leaderboard...";
+  let html = "";
+  for (let i = 0; i < 10; i++) {
+    try {
+      const artist = await contract.methods.artists(i).call();
+      if (!artist || !artist.name || artist.name.trim() === "") {
+        console.warn(`Slot ${i} is empty or blank`);
+        continue;
+      }
+      console.log(`Artist #${i}:`, artist.name, artist.voteCount);
+      html += `
+        <div class="artist">
+          <span>${artist.name} - ${artist.voteCount} votes</span>
+          <button onclick="voteOnArtist(${i})">Vote</button>
+        </div>
+      `;
+    } catch (err) {
+      console.warn(`Error reading artist #${i}:`, err.message);
+      break;
+    }
+  }
+  document.getElementById("leaderboard").innerHTML = html || "No artists found.";
+}
+
+    document.getElementById("connect").onclick = connectWallet;
+    document.getElementById("mint").onclick = mintArtist;
+    window.voteOnArtist = voteOnArtist; // expose for onclick
+  </script>
+</body>
+</html>
