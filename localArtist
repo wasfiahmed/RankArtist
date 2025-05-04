@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract ArtistNFT is ERC721 {
+    uint256 private _tokenIdCounter;
+    
+    struct Artist {
+        string name;
+        uint256 voteCount;
+    }
+
+    mapping(uint256 => Artist) public artists;
+    IERC20 public immutable yodaToken;
+    uint256 public constant VOTE_PRICE = 100;
+
+    constructor(address _yodaToken) ERC721("ArtistNFT", "ART") {
+        yodaToken = IERC20(_yodaToken);
+    }
+
+    function mintArtist(string memory name) external {
+        uint256 newId = _tokenIdCounter;
+        _mint(msg.sender, newId);
+        artists[newId] = Artist(name, 0);
+        _tokenIdCounter++;
+    }
+
+    function vote(uint256 tokenId) external {
+        require(_ownerOf(tokenId) != address(0), "Artist doesn't exist");
+        require(yodaToken.transferFrom(msg.sender, address(this), VOTE_PRICE), "Payment failed");
+        artists[tokenId].voteCount++;
+    }
+
+    function getAllArtists() external view returns (Artist[] memory) {
+        Artist[] memory allArtists = new Artist[](_tokenIdCounter);
+        for (uint256 i = 0; i < _tokenIdCounter; i++) {
+            allArtists[i] = artists[i];
+        }
+        return allArtists;
+    }
+}
